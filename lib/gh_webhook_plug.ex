@@ -14,11 +14,17 @@ defmodule GhWebhookPlug do
         {module, function} = get_module_function_from_opts(options[:action])
         {:ok, payload, _conn} = read_body(conn)
         [signature_in_header] = get_req_header(conn, "x-hub-signature")
-        if verify_signature(payload, secret, signature_in_header) do
-          apply(module, function, [payload])
-          conn |> send_resp(200, "OK") |> halt
-        else
-          conn |> send_resp(403, "Forbidden") |> halt
+        [event_in_header] = get_req_header(conn, "x-github-event")
+        case to_string(event_in_header) do
+          "push" ->
+            if verify_signature(payload, secret, signature_in_header) do
+              apply(module, function, [payload])
+              conn |> send_resp(200, "OK") |> halt
+            else
+              conn |> send_resp(403, "Forbidden") |> halt
+            end
+          _event ->
+            conn
         end
       _ -> conn
     end
